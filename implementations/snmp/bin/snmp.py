@@ -531,18 +531,18 @@ class V3TrapThread(threading.Thread):
             
         config.addV3User(snmpEngine, self.user,self.auth_proto, self.auth_key,self.priv_proto,self.priv_key)
   
-        # Register SNMP Application at the SNMP engine
-        ntfrcv.NotificationReceiver(snmpEngine, v3trapCallback)
-
-        snmpEngine.transportDispatcher.jobStarted(1) # this job would never finish
-
-        # Run I/O dispatcher which would receive queries and send confirmations
         try:
+            # Register SNMP Application at the SNMP engine
+            ntfrcv.NotificationReceiver(snmpEngine, v3trapCallback)
+
+            snmpEngine.transportDispatcher.jobStarted(1) # this job would never finish
+
+            # Run I/O dispatcher which would receive queries and send confirmations
             snmpEngine.transportDispatcher.runDispatcher()
         except: # catch *all* exceptions
             e = sys.exc_info()[1]
             snmpEngine.transportDispatcher.closeDispatcher()
-            logging.error("Looks like an error: %s" % str(e))
+            logging.error("Failed to register v3 Trap NotificationReceiver and run dispatcher: %s" % str(e))
             sys.exit(1)
             
             
