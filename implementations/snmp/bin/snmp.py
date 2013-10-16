@@ -335,144 +335,148 @@ def do_run():
         logging.error("Couldn't update logging templates: %s host:'" % str(e)) 
 
 
-    #snmp 1 and 2C params
-    snmp_version=config.get("snmp_version","2C")
-    
-    communitystring=config.get("communitystring","public")   
-    
-    v3_securityName=config.get("v3_securityName","") 
-    v3_authKey=config.get("v3_authKey","") 
-    v3_privKey=config.get("v3_privKey","") 
-    v3_authProtocol=config.get("v3_authProtocol","usmHMACMD5AuthProtocol") 
-    v3_privProtocol=config.get("v3_privProtocol","usmDESPrivProtocol") 
-    
-    #object names to poll
-    object_names=config.get("object_names")
-    if not object_names is None:
-        oid_args = map(str,object_names.split(","))   
-        #trim any whitespace using a list comprehension
-        oid_args = [x.strip(' ') for x in oid_args]
-    
-    #GET BULK params
-    do_bulk=int(config.get("do_bulk_get",0))
-    split_bulk_output=int(config.get("split_bulk_output",0))
-    non_repeaters=int(config.get("non_repeaters",0))
-    max_repetitions=int(config.get("max_repetitions",25))
-    
-    #TRAP listener params
-    listen_traps=int(config.get("listen_traps",0))
-    trap_port=int(config.get("trap_port",162))
-    trap_host=config.get("trap_host","localhost")
-    
-    #MIBs to load
-    mib_names=config.get("mib_names")
-    mib_names_args=None
-    if not mib_names is None:
-        mib_names_args = map(str,mib_names.split(","))   
-        #trim any whitespace using a list comprehension
-        mib_names_args = [x.strip(' ') for x in mib_names_args]
+    try:
+        #snmp 1 and 2C params
+        snmp_version=config.get("snmp_version","2C")
         
-    #load in custom MIBS
-    cmdGen = cmdgen.CommandGenerator()
-         
-    mibBuilder = cmdGen.snmpEngine.msgAndPduDsp.mibInstrumController.mibBuilder
-    
-    mibSources = (builder.DirMibSource(mib_egg_dir),)  
+        communitystring=config.get("communitystring","public")   
+        
+        v3_securityName=config.get("v3_securityName","") 
+        v3_authKey=config.get("v3_authKey","") 
+        v3_privKey=config.get("v3_privKey","") 
+        v3_authProtocol=config.get("v3_authProtocol","usmHMACMD5AuthProtocol") 
+        v3_privProtocol=config.get("v3_privProtocol","usmDESPrivProtocol") 
+        
+        #object names to poll
+        object_names=config.get("object_names")
+        if not object_names is None:
+            oid_args = map(str,object_names.split(","))   
+            #trim any whitespace using a list comprehension
+            oid_args = [x.strip(' ') for x in oid_args]
+        
+        #GET BULK params
+        do_bulk=int(config.get("do_bulk_get",0))
+        split_bulk_output=int(config.get("split_bulk_output",0))
+        non_repeaters=int(config.get("non_repeaters",0))
+        max_repetitions=int(config.get("max_repetitions",25))
+        
+        #TRAP listener params
+        listen_traps=int(config.get("listen_traps",0))
+        trap_port=int(config.get("trap_port",162))
+        trap_host=config.get("trap_host","localhost")
+        
+        #MIBs to load
+        mib_names=config.get("mib_names")
+        mib_names_args=None
+        if not mib_names is None:
+            mib_names_args = map(str,mib_names.split(","))   
+            #trim any whitespace using a list comprehension
+            mib_names_args = [x.strip(' ') for x in mib_names_args]
+            
+        #load in custom MIBS
+        cmdGen = cmdgen.CommandGenerator()
              
-    for filename in os.listdir(mib_egg_dir):
-       if filename.endswith(".egg"):          
-           mibSources = mibSources + (builder.ZipMibSource(filename),)
-    
-    mibSources = mibBuilder.getMibSources() + mibSources
-    mibBuilder.setMibSources(*mibSources)
-    
-    
-    if mib_names_args:
-        mibBuilder.loadModules(*mib_names_args)
+        mibBuilder = cmdGen.snmpEngine.msgAndPduDsp.mibInstrumController.mibBuilder
         
-    global mibView
-    mibView = view.MibViewController(mibBuilder)
-    
-    if listen_traps:
-        if snmp_version == "1" or snmp_version == "2C":
-            trapThread = TrapThread(trap_port,trap_host,ipv6)
-            trapThread.start()
-        if snmp_version == "3":
-            trapThread = V3TrapThread(trap_port,trap_host,ipv6,v3_securityName,v3_authKey,v3_authProtocol,v3_privKey,v3_privProtocol)
-            trapThread.start()  
-      
-    if not (object_names is None and destination is None):      
-        try:
-                       
-            if ipv6:
-                transport = cmdgen.Udp6TransportTarget((destination, port)) 
-            else:
-                transport = cmdgen.UdpTransportTarget((destination, port))  
+        mibSources = (builder.DirMibSource(mib_egg_dir),)  
+                 
+        for filename in os.listdir(mib_egg_dir):
+           if filename.endswith(".egg"):          
+               mibSources = mibSources + (builder.ZipMibSource(filename),)
+        
+        mibSources = mibBuilder.getMibSources() + mibSources
+        mibBuilder.setMibSources(*mibSources)
+        
+        
+        if mib_names_args:
+            mibBuilder.loadModules(*mib_names_args)
             
-            mp_model_val=1
-            
-            if snmp_version == "1":
-                mp_model_val=0
-                         
+        global mibView
+        mibView = view.MibViewController(mibBuilder)
+        
+        if listen_traps:
+            if snmp_version == "1" or snmp_version == "2C":
+                trapThread = TrapThread(trap_port,trap_host,ipv6)
+                trapThread.start()
             if snmp_version == "3":
-                security_object = cmdgen.UsmUserData( v3_securityName, authKey=v3_authKey, privKey=v3_privKey, authProtocol=v3_authProtocol, privProtocol=v3_privProtocol )
-            else:
-                security_object = cmdgen.CommunityData(communitystring,mpModel=mp_model_val)
-            
-            while True:  
-                if do_bulk and not snmp_version == "1":
-                    try:      
-                        errorIndication, errorStatus, errorIndex, varBindTable = cmdGen.bulkCmd(
-                            security_object,
-                            transport,
-                            non_repeaters, max_repetitions,
-                            *oid_args, lookupNames=True, lookupValues=True)
-                    except: # catch *all* exceptions
-                        e = sys.exc_info()[1]
-                        logging.error("Exception with bulkCmd to %s:%s: %s" % (destination, port, str(e)))
-                        raise
+                trapThread = V3TrapThread(trap_port,trap_host,ipv6,v3_securityName,v3_authKey,v3_authProtocol,v3_privKey,v3_privProtocol)
+                trapThread.start()  
+          
+        if not (object_names is None and destination is None):      
+            try:
+                           
+                if ipv6:
+                    transport = cmdgen.Udp6TransportTarget((destination, port)) 
                 else:
-                    try:
-                        errorIndication, errorStatus, errorIndex, varBinds = cmdGen.getCmd(
-                            security_object,
-                            transport,
-                            *oid_args, lookupNames=True, lookupValues=True)
-                    except: # catch *all* exceptions
-                        e = sys.exc_info()[1]
-                        logging.error("Exception with bulkCmd to %s:%s: %s" % (destination, port, str(e)))
-                        raise
-
-                if errorIndication:
-                    logging.error(errorIndication)
-                elif errorStatus:
-                    logging.error(errorStatus)
-                else:
-                    splunkevent =""
+                    transport = cmdgen.UdpTransportTarget((destination, port))  
                 
-                    if do_bulk:
-                        for varBindTableRow in varBindTable:
-                            for name, val in varBindTableRow:
-                                output_element = '%s = "%s" ' % (name.prettyPrint(), val.prettyPrint())                               
-                                if split_bulk_output:
-                                    print_xml_single_instance_mode(destination, output_element)
-                                    sys.stdout.flush()   
-                                else:    
-                                    splunkevent += output_element 
-                    else:    
-                        for name, val in varBinds:
-                            splunkevent += '%s = "%s" ' % (name.prettyPrint(), val.prettyPrint())
-                   
-                   
-                    if not split_bulk_output:
-                        print_xml_single_instance_mode(destination, splunkevent)
-                        sys.stdout.flush() 
-                            
-                time.sleep(float(snmpinterval))        
-            
-        except: # catch *all* exceptions
-            e = sys.exc_info()[1]
-            logging.error("Looks like an error: %s" % str(e))
-            sys.exit(1)
+                mp_model_val=1
+                
+                if snmp_version == "1":
+                    mp_model_val=0
+                             
+                if snmp_version == "3":
+                    security_object = cmdgen.UsmUserData( v3_securityName, authKey=v3_authKey, privKey=v3_privKey, authProtocol=v3_authProtocol, privProtocol=v3_privProtocol )
+                else:
+                    security_object = cmdgen.CommunityData(communitystring,mpModel=mp_model_val)
+                
+                while True:  
+                    if do_bulk and not snmp_version == "1":
+                        try:      
+                            errorIndication, errorStatus, errorIndex, varBindTable = cmdGen.bulkCmd(
+                                security_object,
+                                transport,
+                                non_repeaters, max_repetitions,
+                                *oid_args, lookupNames=True, lookupValues=True)
+                        except: # catch *all* exceptions
+                            e = sys.exc_info()[1]
+                            logging.error("Exception with bulkCmd to %s:%s: %s" % (destination, port, str(e)))
+                            raise
+                    else:
+                        try:
+                            errorIndication, errorStatus, errorIndex, varBinds = cmdGen.getCmd(
+                                security_object,
+                                transport,
+                                *oid_args, lookupNames=True, lookupValues=True)
+                        except: # catch *all* exceptions
+                            e = sys.exc_info()[1]
+                            logging.error("Exception with bulkCmd to %s:%s: %s" % (destination, port, str(e)))
+                            raise
+
+                    if errorIndication:
+                        logging.error(errorIndication)
+                    elif errorStatus:
+                        logging.error(errorStatus)
+                    else:
+                        splunkevent =""
+                    
+                        if do_bulk:
+                            for varBindTableRow in varBindTable:
+                                for name, val in varBindTableRow:
+                                    output_element = '%s = "%s" ' % (name.prettyPrint(), val.prettyPrint())                               
+                                    if split_bulk_output:
+                                        print_xml_single_instance_mode(destination, output_element)
+                                        sys.stdout.flush()   
+                                    else:    
+                                        splunkevent += output_element 
+                        else:    
+                            for name, val in varBinds:
+                                splunkevent += '%s = "%s" ' % (name.prettyPrint(), val.prettyPrint())
+                       
+                       
+                        if not split_bulk_output:
+                            print_xml_single_instance_mode(destination, splunkevent)
+                            sys.stdout.flush() 
+                                
+                    time.sleep(float(snmpinterval))        
+                
+            except: # catch *all* exceptions
+                e = sys.exc_info()[1]
+                logging.error("Looks like an error: %s" % str(e))
+                sys.exit(1)
+    except: # catch *all* exceptions
+        e = sys.exc_info()[1]
+        logging.error("Exception in run %s" % str(e)) 
         
 class TrapThread(threading.Thread):
     
